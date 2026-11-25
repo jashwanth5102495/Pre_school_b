@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const school_admin_controller_1 = require("../controllers/school-admin.controller");
+const auth_1 = require("../middlewares/auth");
+const tenant_1 = require("../middlewares/tenant");
+const rbac_1 = require("../middlewares/rbac");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+// Protect all school admin routes with Auth, Tenant isolation, and School Admin role
+router.use(auth_1.authenticate, tenant_1.enforceTenantContext, (0, rbac_1.requireSchoolRole)(client_1.SchoolRole.SCHOOL_ADMIN));
+router.get('/dashboard', (req, res) => school_admin_controller_1.schoolAdminController.getDashboard(req, res));
+router.get('/students', (req, res) => school_admin_controller_1.schoolAdminController.getStudents(req, res));
+router.post('/students', (req, res) => school_admin_controller_1.schoolAdminController.createStudent(req, res));
+router.get('/students/:id', (req, res) => school_admin_controller_1.schoolAdminController.getStudentById(req, res));
+router.put('/students/:id', (req, res) => school_admin_controller_1.schoolAdminController.updateStudent(req, res));
+router.get('/staff', (req, res) => school_admin_controller_1.schoolAdminController.getStaff(req, res));
+router.post('/staff', (req, res) => school_admin_controller_1.schoolAdminController.createStaff(req, res));
+router.get('/classes', (req, res) => school_admin_controller_1.schoolAdminController.getClasses(req, res));
+router.get('/fees/overview', (req, res) => school_admin_controller_1.schoolAdminController.getFeesOverview(req, res));
+router.get('/attendance/overview', (req, res) => school_admin_controller_1.schoolAdminController.getAttendanceOverview(req, res));
+router.get('/profile', (req, res) => school_admin_controller_1.schoolAdminController.getProfile(req, res));
+router.put('/profile', (req, res) => school_admin_controller_1.schoolAdminController.updateProfile(req, res));
+exports.default = router;

@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const school_controller_1 = require("../controllers/school.controller");
+const auth_1 = require("../middlewares/auth");
+const rbac_1 = require("../middlewares/rbac");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.use((0, rbac_1.requirePlatformRole)(client_1.PlatformRole.SUPER_ADMIN, client_1.PlatformRole.PLATFORM_SUPPORT));
+router.get('/', (req, res, next) => school_controller_1.schoolController.listSchools(req, res, next));
+router.post('/', (req, res, next) => school_controller_1.schoolController.provisionSchool(req, res, next));
+router.get('/:id', (req, res, next) => school_controller_1.schoolController.getSchoolById(req, res, next));
+router.patch('/:id', (req, res, next) => school_controller_1.schoolController.updateSchool(req, res, next));
+router.patch('/:id/status', (req, res, next) => school_controller_1.schoolController.updateSchoolStatus(req, res, next));
+router.post('/:id/invitations', (req, res, next) => school_controller_1.schoolController.resendInvitation(req, res, next));
+router.delete('/:id', (req, res, next) => school_controller_1.schoolController.archiveSchool(req, res, next));
+exports.default = router;

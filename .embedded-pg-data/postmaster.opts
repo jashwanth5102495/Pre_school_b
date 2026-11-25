@@ -1,0 +1,1 @@
+C:/Users/jashw/Desktop/school/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe "-D" "C:\Users\jashw\Desktop\school\backend\.embedded-pg-data" "-p" "5433"

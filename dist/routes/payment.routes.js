@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const payment_controller_1 = require("../controllers/payment.controller");
+const auth_1 = require("../middlewares/auth");
+const rbac_1 = require("../middlewares/rbac");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.use((0, rbac_1.requirePlatformRole)(client_1.PlatformRole.SUPER_ADMIN, client_1.PlatformRole.PLATFORM_FINANCE));
+router.get('/', (req, res, next) => payment_controller_1.paymentController.listPayments(req, res, next));
+router.get('/invoices', (req, res, next) => payment_controller_1.paymentController.listInvoices(req, res, next));
+router.post('/create-order', (req, res, next) => payment_controller_1.paymentController.createOrder(req, res, next));
+router.post('/verify', (req, res, next) => payment_controller_1.paymentController.verifyPayment(req, res, next));
+exports.default = router;

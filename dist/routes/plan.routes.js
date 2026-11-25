@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const plan_controller_1 = require("../controllers/plan.controller");
+const auth_1 = require("../middlewares/auth");
+const rbac_1 = require("../middlewares/rbac");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.use((0, rbac_1.requirePlatformRole)(client_1.PlatformRole.SUPER_ADMIN, client_1.PlatformRole.PLATFORM_SUPPORT, client_1.PlatformRole.PLATFORM_FINANCE));
+router.get('/plans', (req, res, next) => plan_controller_1.planController.listPlans(req, res, next));
+router.post('/plans', (req, res, next) => plan_controller_1.planController.createPlan(req, res, next));
+router.patch('/plans/:id', (req, res, next) => plan_controller_1.planController.updatePlan(req, res, next));
+router.get('/subscriptions', (req, res, next) => plan_controller_1.planController.listSubscriptions(req, res, next));
+router.post('/subscriptions/:id/renew', (req, res, next) => plan_controller_1.planController.renewSubscription(req, res, next));
+exports.default = router;
