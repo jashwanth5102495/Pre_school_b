@@ -23,7 +23,7 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function main() {
+export async function main() {
   console.log('--- SEEDING DATABASE FOR MULTI-TENANT SAAS & ALL 5 PORTALS ---');
 
   // 1. Seed Super Admin Platform User

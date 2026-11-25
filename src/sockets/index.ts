@@ -10,7 +10,7 @@ export function initializeSockets(server: HttpServer) {
 
   io = new SocketIOServer(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: '*',
       credentials: true,
     },
   });

@@ -14,6 +14,19 @@ async function bootstrap() {
     await prisma.$connect();
     console.log('[Server] Successfully connected to PostgreSQL database.');
 
+    // Auto-seed initial platform data if empty (e.g. on fresh Railway / cloud deployment)
+    try {
+      const platformUserCount = await prisma.platformUser.count();
+      if (platformUserCount === 0) {
+        console.log('[Server] Database is empty. Seeding initial super admin and starter school data...');
+        const { main: runSeed } = await import('../prisma/seed');
+        await runSeed();
+        console.log('[Server] Initial database seeding completed.');
+      }
+    } catch (seedErr: any) {
+      console.warn('[Server] Auto-seed check finished:', seedErr?.message || seedErr);
+    }
+
     // 3. Create HTTP Server & initialize Sockets
     const server = http.createServer(app);
     initializeSockets(server);
