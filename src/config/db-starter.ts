@@ -23,6 +23,11 @@ function checkConnection(port: number, host = '127.0.0.1'): Promise<boolean> {
 }
 
 export async function ensurePostgresRunning() {
+  // In production or when deploying to Railway / external Postgres, skip embedded postgres
+  if (process.env.NODE_ENV === 'production' || process.env.SKIP_EMBEDDED_PG === 'true') {
+    return;
+  }
+
   const port = parseInt(process.env.EMBEDDED_POSTGRES_PORT || '5433', 10);
   const isOnline = await checkConnection(port);
   if (isOnline) {

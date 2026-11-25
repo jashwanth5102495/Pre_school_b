@@ -24,6 +24,7 @@ const school_admin_routes_1 = __importDefault(require("./routes/school-admin.rou
 const head_master_routes_1 = __importDefault(require("./routes/head-master.routes"));
 const office_admin_routes_1 = __importDefault(require("./routes/office-admin.routes"));
 const teacher_portal_routes_1 = __importDefault(require("./routes/teacher-portal.routes"));
+const hierarchy_routes_1 = __importDefault(require("./routes/hierarchy.routes"));
 const app = (0, express_1.default)();
 // Security Middlewares
 app.use((0, helmet_1.default)());
@@ -96,6 +97,8 @@ app.use('/api/v1/school/admin', school_admin_routes_1.default);
 app.use('/api/v1/school/head-master', head_master_routes_1.default);
 app.use('/api/v1/school/office', office_admin_routes_1.default);
 app.use('/api/v1/school/teacher', teacher_portal_routes_1.default);
+// Mount Hierarchy Tree API Routes (Synchronized across all roles)
+app.use('/api/v1/hierarchy', hierarchy_routes_1.default);
 // Centralized Error Handler
 app.use(error_handler_1.errorHandler);
 exports.default = app;

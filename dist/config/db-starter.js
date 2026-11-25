@@ -35,9 +35,17 @@ async function ensurePostgresRunning() {
     }
     console.log(`[Database] Starting embedded PostgreSQL on port ${port}...`);
     try {
+        const dataDir = path_1.default.resolve(__dirname, '../../.embedded-pg-data');
+        const pidFile = path_1.default.join(dataDir, 'postmaster.pid');
+        if (fs_1.default.existsSync(pidFile)) {
+            console.log(`[Database] Removing stale postmaster.pid from previous shutdown...`);
+            try {
+                fs_1.default.unlinkSync(pidFile);
+            }
+            catch (e) { }
+        }
         const embeddedPostgresModule = await eval('import("embedded-postgres")');
         const EmbeddedPostgres = embeddedPostgresModule.default || embeddedPostgresModule;
-        const dataDir = path_1.default.resolve(__dirname, '../../.embedded-pg-data');
         const isInit = fs_1.default.existsSync(path_1.default.join(dataDir, 'PG_VERSION'));
         const pg = new EmbeddedPostgres({
             databaseDir: dataDir,

@@ -24,9 +24,9 @@ export class HierarchyController {
 
   async updateMember(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const { type } = req.query as { type: string };
-      const updated = await hierarchyService.updateMember(id, type || 'STAFF', req.body, req.user);
+      const id = req.params.id as string;
+      const type = (req.query.type as string) || 'STAFF';
+      const updated = await hierarchyService.updateMember(id, type, req.body, req.user);
       return successResponse(res, updated, 'Member updated successfully');
     } catch (error: any) {
       return errorResponse(res, error.message || 'Failed to update hierarchy member', 400);
@@ -35,9 +35,9 @@ export class HierarchyController {
 
   async deleteMember(req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = req.params;
-      const { type } = req.query as { type: string };
-      await hierarchyService.deleteMember(id, type || 'STAFF');
+      const id = req.params.id as string;
+      const type = (req.query.type as string) || 'STAFF';
+      await hierarchyService.deleteMember(id, type);
       return successResponse(res, null, 'Member removed from hierarchy');
     } catch (error: any) {
       return errorResponse(res, error.message || 'Failed to delete hierarchy member', 400);
