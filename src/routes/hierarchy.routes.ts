@@ -12,4 +12,11 @@ router.post('/members', (req, res, next) => hierarchyController.createMember(req
 router.patch('/members/:id', (req, res, next) => hierarchyController.updateMember(req, res, next));
 router.delete('/members/:id', (req, res, next) => hierarchyController.deleteMember(req, res, next));
 
+// Classes & Teacher Mapping routes directly from Hierarchy Tree
+router.post('/classes', (req, res, next) => hierarchyController.createClass(req, res, next));
+router.delete('/classes/:id', (req, res, next) => hierarchyController.deleteClass(req, res, next));
+router.post('/sections', (req, res, next) => hierarchyController.createSection(req, res, next));
+router.post('/allocate', (req, res, next) => hierarchyController.allocateTeacher(req, res, next));
+router.delete('/allocate/:id', (req, res, next) => hierarchyController.deleteAllocation(req, res, next));
+
 export default router;

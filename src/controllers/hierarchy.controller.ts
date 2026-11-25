@@ -43,6 +43,58 @@ export class HierarchyController {
       return errorResponse(res, error.message || 'Failed to delete hierarchy member', 400);
     }
   }
+
+  async createClass(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.body.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const created = await hierarchyService.createClass(schoolId, req.body, req.user);
+      return successResponse(res, created, 'Academic class created in hierarchy', 201);
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to create academic class', 400);
+    }
+  }
+
+  async createSection(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.body.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const created = await hierarchyService.createSection(schoolId, req.body, req.user);
+      return successResponse(res, created, 'Section created successfully', 201);
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to create section', 400);
+    }
+  }
+
+  async deleteClass(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.query.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const classId = req.params.id as string;
+      await hierarchyService.deleteClass(schoolId, classId);
+      return successResponse(res, null, 'Class removed from hierarchy');
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to delete class', 400);
+    }
+  }
+
+  async allocateTeacher(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.body.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const allocation = await hierarchyService.allocateTeacher(schoolId, req.body, req.user);
+      return successResponse(res, allocation, 'Teacher connected to class successfully', 201);
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to allocate teacher to class', 400);
+    }
+  }
+
+  async deleteAllocation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.query.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const allocationId = req.params.id as string;
+      await hierarchyService.deleteAllocation(schoolId, allocationId);
+      return successResponse(res, null, 'Teacher allocation removed');
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to remove allocation', 400);
+    }
+  }
 }
 
 export const hierarchyController = new HierarchyController();

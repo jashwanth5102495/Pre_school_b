@@ -108,9 +108,9 @@ export class HierarchyService {
             include: {
               allocations: {
                 include: {
-                  class: { select: { id: true, name: true } },
+                  class: { select: { id: true, name: true, code: true } },
                   section: { select: { id: true, name: true } },
-                  subject: { select: { id: true, name: true } },
+                  subject: { select: { id: true, name: true, code: true } },
                 },
               },
             },
@@ -131,7 +131,30 @@ export class HierarchyService {
       }),
       prisma.schoolClass.findMany({
         where: { schoolId: targetSchoolId },
-        include: { sections: true },
+        include: {
+          sections: {
+            include: {
+              _count: { select: { students: true } },
+            },
+            orderBy: { name: 'asc' },
+          },
+          teacherAllocations: {
+            include: {
+              teacher: {
+                select: {
+                  id: true,
+                  userId: true,
+                  teacherCode: true,
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+              section: { select: { id: true, name: true } },
+              subject: { select: { id: true, name: true, code: true } },
+            },
+          },
+        },
         orderBy: { code: 'asc' },
       }),
     ]);
@@ -446,6 +469,223 @@ export class HierarchyService {
     }
 
     return prisma.schoolUser.delete({ where: { id } });
+  }
+
+  /**
+   * Create an Academic Class directly from the hierarchy tree
+   */
+  async createClass(schoolId: string, data: { name: string; code?: string; sections?: string[] }, actor: any) {
+    if (!schoolId) throw new Error('schoolId is required');
+    const name = data.name.trim();
+    if (!name) throw new Error('Class name is required');
+    const code = data.code?.trim() || name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6) || 'CLS';
+
+    const sectionNames = data.sections && data.sections.length > 0 ? data.sections : ['Section A'];
+
+    const newClass = await prisma.schoolClass.create({
+      data: {
+        schoolId,
+        name,
+        code,
+        sections: {
+          create: sectionNames.map((sName) => ({
+            schoolId,
+            name: sName.trim() || 'Section A',
+            capacity: 40,
+          })),
+        },
+      },
+      include: {
+        sections: {
+          include: {
+            _count: { select: { students: true } },
+          },
+        },
+        teacherAllocations: true,
+      },
+    });
+
+    return newClass;
+  }
+
+  /**
+   * Add a Section to an existing class
+   */
+  async createSection(schoolId: string, data: { classId: string; name: string; capacity?: number }, actor: any) {
+    if (!schoolId) throw new Error('schoolId is required');
+    if (!data.classId) throw new Error('classId is required');
+    return prisma.schoolSection.create({
+      data: {
+        schoolId,
+        classId: data.classId,
+        name: data.name || 'Section',
+        capacity: data.capacity || 40,
+      },
+    });
+  }
+
+  /**
+   * Safely delete a class from the hierarchy
+   */
+  async deleteClass(schoolId: string, classId: string) {
+    await prisma.student.updateMany({
+      where: { schoolId, classId },
+      data: { classId: null, sectionId: null },
+    });
+    await prisma.teacherAllocation.deleteMany({ where: { schoolId, classId } });
+    await prisma.timetablePeriod.deleteMany({ where: { schoolId, classId } });
+    await prisma.attendanceSession.deleteMany({ where: { schoolId, classId } });
+    await prisma.classSubject.deleteMany({ where: { classId } });
+    await prisma.schoolSection.deleteMany({ where: { schoolId, classId } });
+    return prisma.schoolClass.delete({ where: { id: classId } });
+  }
+
+  /**
+   * Connect / Allot a teacher to an Academic Class & Section
+   */
+  async allocateTeacher(
+    schoolId: string,
+    data: { teacherId: string; classId: string; sectionId?: string; subjectId?: string; isClassTeacher?: boolean },
+    actor: any
+  ) {
+    if (!schoolId) throw new Error('schoolId is required');
+    if (!data.teacherId) throw new Error('teacherId is required');
+    if (!data.classId) throw new Error('classId is required');
+
+    // 1. Resolve teacher record
+    let teacher = await prisma.teacher.findFirst({
+      where: { OR: [{ id: data.teacherId }, { userId: data.teacherId }] },
+    });
+
+    if (!teacher) {
+      const user = await prisma.schoolUser.findUnique({ where: { id: data.teacherId } });
+      if (user) {
+        teacher = await prisma.teacher.create({
+          data: {
+            schoolId,
+            userId: user.id,
+            teacherCode: `TCH-${user.id.slice(0, 4)}`,
+            firstName: user.fullName.split(' ')[0] || 'Teacher',
+            lastName: user.fullName.split(' ').slice(1).join(' ') || '',
+            email: user.email,
+            phone: user.phone,
+            designation: 'Faculty Teacher',
+            status: 'ACTIVE',
+          },
+        });
+      }
+    }
+
+    if (!teacher) {
+      throw new Error('Teacher profile could not be found or initialized');
+    }
+
+    // 2. Resolve section
+    let sectionId = data.sectionId;
+    if (!sectionId) {
+      const firstSec = await prisma.schoolSection.findFirst({
+        where: { schoolId, classId: data.classId },
+      });
+      if (firstSec) {
+        sectionId = firstSec.id;
+      } else {
+        const createdSec = await prisma.schoolSection.create({
+          data: {
+            schoolId,
+            classId: data.classId,
+            name: 'Section A',
+            capacity: 40,
+          },
+        });
+        sectionId = createdSec.id;
+      }
+    }
+
+    // 3. Resolve subject
+    let subjectId = data.subjectId;
+    if (!subjectId) {
+      let subj = await prisma.subject.findFirst({ where: { schoolId } });
+      if (!subj) {
+        subj = await prisma.subject.create({
+          data: {
+            schoolId,
+            name: 'General Studies',
+            code: 'GEN-01',
+            category: 'CORE',
+          },
+        });
+      }
+      subjectId = subj.id;
+    }
+
+    // If marked as class teacher, unset previous class teacher for this section
+    if (data.isClassTeacher) {
+      await prisma.teacherAllocation.updateMany({
+        where: {
+          schoolId,
+          classId: data.classId,
+          sectionId,
+          isClassTeacher: true,
+        },
+        data: { isClassTeacher: false },
+      });
+    }
+
+    // 4. Create or update allocation
+    const existing = await prisma.teacherAllocation.findFirst({
+      where: {
+        schoolId,
+        teacherId: teacher.id,
+        classId: data.classId,
+        sectionId,
+      },
+    });
+
+    if (existing) {
+      return prisma.teacherAllocation.update({
+        where: { id: existing.id },
+        data: {
+          isClassTeacher: data.isClassTeacher ?? existing.isClassTeacher,
+          subjectId,
+        },
+        include: {
+          teacher: true,
+          class: true,
+          section: true,
+          subject: true,
+        },
+      });
+    }
+
+    return prisma.teacherAllocation.create({
+      data: {
+        schoolId,
+        teacherId: teacher.id,
+        classId: data.classId,
+        sectionId,
+        subjectId,
+        isClassTeacher: !!data.isClassTeacher,
+      },
+      include: {
+        teacher: true,
+        class: true,
+        section: true,
+        subject: true,
+      },
+    });
+  }
+
+  /**
+   * Remove teacher allocation
+   */
+  async deleteAllocation(schoolId: string, id: string) {
+    const existing = await prisma.teacherAllocation.findFirst({
+      where: { id, schoolId },
+    });
+    if (!existing) {
+      return prisma.teacherAllocation.delete({ where: { id } }).catch(() => null);
+    }
+    return prisma.teacherAllocation.delete({ where: { id } });
   }
 }
 
