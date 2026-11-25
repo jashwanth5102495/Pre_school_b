@@ -95,6 +95,30 @@ export class HierarchyController {
       return errorResponse(res, error.message || 'Failed to remove allocation', 400);
     }
   }
+
+  async addSubjectToClass(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.body.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const classId = req.params.id as string;
+      const subjectId = req.body.subjectId as string;
+      const cs = await hierarchyService.addSubjectToClass(schoolId, classId, subjectId);
+      return successResponse(res, cs, 'Subject added to class endpoint', 201);
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to add subject to class', 400);
+    }
+  }
+
+  async removeSubjectFromClass(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = (req.query.schoolId || req.tenantId || (req.user as any)?.schoolId) as string;
+      const classId = req.params.id as string;
+      const subjectId = req.params.subjectId as string;
+      await hierarchyService.removeSubjectFromClass(schoolId, classId, subjectId);
+      return successResponse(res, null, 'Subject removed from class');
+    } catch (error: any) {
+      return errorResponse(res, error.message || 'Failed to remove subject from class', 400);
+    }
+  }
 }
 
 export const hierarchyController = new HierarchyController();

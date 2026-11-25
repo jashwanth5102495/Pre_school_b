@@ -24,7 +24,7 @@ export class HierarchyService {
    * Helper to ensure standard classes/sections exist for a school so allocations work
    */
   async ensureStarterClasses(schoolId: string) {
-    const existingClasses = await prisma.schoolClass.findMany({ where: { schoolId } });
+    let existingClasses = await prisma.schoolClass.findMany({ where: { schoolId } });
     if (existingClasses.length === 0) {
       const g10 = await prisma.schoolClass.create({
         data: {
@@ -53,8 +53,47 @@ export class HierarchyService {
         include: { sections: true },
       });
 
-      return [g10, g9];
+      existingClasses = [g10, g9];
     }
+
+    // Ensure school has standard core subjects
+    let schoolSubjects = await prisma.subject.findMany({ where: { schoolId } });
+    if (schoolSubjects.length === 0) {
+      const starterDefs = [
+        { name: 'Mathematics', code: 'MATH-101', category: 'CORE' },
+        { name: 'Physics', code: 'PHY-101', category: 'CORE' },
+        { name: 'English Literature', code: 'ENG-101', category: 'LANGUAGE' },
+        { name: 'Chemistry', code: 'CHEM-101', category: 'CORE' },
+        { name: 'Computer Science', code: 'CS-101', category: 'LAB' },
+        { name: 'Social Studies', code: 'SST-101', category: 'CORE' },
+      ];
+      for (const def of starterDefs) {
+        await prisma.subject.create({
+          data: { schoolId, ...def },
+        }).catch(() => null);
+      }
+      schoolSubjects = await prisma.subject.findMany({ where: { schoolId } });
+    }
+
+    // Ensure every class has classSubjects linked (so class has subject endpoints)
+    for (const cls of existingClasses) {
+      const existingCS = await prisma.classSubject.findMany({
+        where: { schoolId, classId: cls.id },
+      });
+      if (existingCS.length === 0) {
+        const topSubjects = schoolSubjects.slice(0, 6);
+        for (const sub of topSubjects) {
+          await prisma.classSubject.create({
+            data: {
+              schoolId,
+              classId: cls.id,
+              subjectId: sub.id,
+            },
+          }).catch(() => null);
+        }
+      }
+    }
+
     return existingClasses;
   }
 
@@ -88,7 +127,7 @@ export class HierarchyService {
     await this.ensureStarterClasses(targetSchoolId);
 
     // Fetch school with profile, users, teachers, students, and classes
-    const [school, allSchools, classes] = await Promise.all([
+    const [school, allSchools, classes, allSubjects] = await Promise.all([
       prisma.school.findUnique({
         where: { id: targetSchoolId },
         include: {
@@ -138,6 +177,12 @@ export class HierarchyService {
             },
             orderBy: { name: 'asc' },
           },
+          classSubjects: {
+            include: {
+              subject: true,
+            },
+            orderBy: { subject: { name: 'asc' } },
+          },
           teacherAllocations: {
             include: {
               teacher: {
@@ -156,6 +201,10 @@ export class HierarchyService {
           },
         },
         orderBy: { code: 'asc' },
+      }),
+      prisma.subject.findMany({
+        where: { schoolId: targetSchoolId },
+        orderBy: { name: 'asc' },
       }),
     ]);
 
@@ -229,6 +278,7 @@ export class HierarchyService {
       },
       allSchools,
       classes,
+      subjects: allSubjects,
       principals: principalUsers,
       academics: academicUsers,
       finances: officeUsers,
@@ -501,11 +551,54 @@ export class HierarchyService {
             _count: { select: { students: true } },
           },
         },
+        classSubjects: {
+          include: { subject: true },
+        },
         teacherAllocations: true,
       },
     });
 
+    // Link school subjects to this new class
+    const schoolSubs = await prisma.subject.findMany({ where: { schoolId } });
+    const topSubs = schoolSubs.slice(0, 6);
+    for (const sub of topSubs) {
+      await prisma.classSubject.create({
+        data: {
+          schoolId,
+          classId: newClass.id,
+          subjectId: sub.id,
+        },
+      }).catch(() => null);
+    }
+
     return newClass;
+  }
+
+  /**
+   * Add a Subject to a Class (creates a new endpoint on the class node)
+   */
+  async addSubjectToClass(schoolId: string, classId: string, subjectId: string) {
+    return prisma.classSubject.upsert({
+      where: {
+        schoolId_classId_subjectId: { schoolId, classId, subjectId },
+      },
+      update: {},
+      create: { schoolId, classId, subjectId },
+      include: { subject: true },
+    });
+  }
+
+  /**
+   * Remove a Subject from a Class
+   */
+  async removeSubjectFromClass(schoolId: string, classId: string, subjectId: string) {
+    // Delete any allocations for this class and subject
+    await prisma.teacherAllocation.deleteMany({
+      where: { schoolId, classId, subjectId },
+    });
+    return prisma.classSubject.deleteMany({
+      where: { schoolId, classId, subjectId },
+    });
   }
 
   /**
@@ -638,6 +731,7 @@ export class HierarchyService {
         teacherId: teacher.id,
         classId: data.classId,
         sectionId,
+        subjectId,
       },
     });
 

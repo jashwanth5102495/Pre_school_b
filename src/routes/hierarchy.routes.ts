@@ -19,4 +19,8 @@ router.post('/sections', (req, res, next) => hierarchyController.createSection(r
 router.post('/allocate', (req, res, next) => hierarchyController.allocateTeacher(req, res, next));
 router.delete('/allocate/:id', (req, res, next) => hierarchyController.deleteAllocation(req, res, next));
 
+// Class Subject Endpoints
+router.post('/classes/:id/subjects', (req, res, next) => hierarchyController.addSubjectToClass(req, res, next));
+router.delete('/classes/:id/subjects/:subjectId', (req, res, next) => hierarchyController.removeSubjectFromClass(req, res, next));
+
 export default router;
