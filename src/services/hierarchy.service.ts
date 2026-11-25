@@ -262,6 +262,21 @@ export class HierarchyService {
         lastName = parts.slice(1).join(' ') || '';
       }
 
+      let assignedClassId: string | undefined = data.classId || undefined;
+      let assignedSectionId: string | undefined = data.sectionId || undefined;
+
+      if (!assignedClassId || !assignedSectionId) {
+        const starter = await this.ensureStarterClasses(schoolId);
+        const primaryClass = starter[0];
+        if (!assignedClassId && primaryClass) assignedClassId = primaryClass.id;
+        if (!assignedSectionId && primaryClass) {
+          const section = await prisma.schoolSection.findFirst({
+            where: { schoolId, classId: primaryClass.id },
+          });
+          assignedSectionId = section?.id || undefined;
+        }
+      }
+
       const student = await prisma.student.create({
         data: {
           schoolId,
@@ -271,8 +286,8 @@ export class HierarchyService {
           lastName: lastName || 'Student',
           email: data.email?.toLowerCase().trim() || null,
           phone: data.phone || null,
-          classId: data.classId || null,
-          sectionId: data.sectionId || null,
+          classId: assignedClassId || undefined,
+          sectionId: assignedSectionId || undefined,
           status: 'ACTIVE',
         },
         include: {
@@ -385,12 +400,51 @@ export class HierarchyService {
   }
 
   /**
-   * Delete member from hierarchy
+   * Delete member from hierarchy safely handling relational dependencies
    */
   async deleteMember(id: string, type: string) {
     if (type === 'STUDENT') {
+      await prisma.studentAttendance.deleteMany({ where: { studentId: id } });
+      await prisma.studentMarks.deleteMany({ where: { studentId: id } });
+      await prisma.studentFee.deleteMany({ where: { studentId: id } });
+      await prisma.studentDocument.deleteMany({ where: { studentId: id } });
+      await prisma.homeworkSubmission.deleteMany({ where: { studentId: id } });
       return prisma.student.delete({ where: { id } });
     }
+
+    if (type === 'TEACHER') {
+      const teacher = await prisma.teacher.findFirst({
+        where: { OR: [{ id }, { userId: id }] },
+      });
+
+      if (teacher) {
+        await prisma.teacherAllocation.deleteMany({ where: { teacherId: teacher.id } });
+        await prisma.timetablePeriod.deleteMany({ where: { teacherId: teacher.id } });
+        await prisma.teacherAttendance.deleteMany({ where: { teacherId: teacher.id } });
+        await prisma.leaveBalance.deleteMany({ where: { teacherId: teacher.id } });
+        await prisma.leaveApplication.deleteMany({ where: { teacherId: teacher.id } });
+        await prisma.teacher.delete({ where: { id: teacher.id } });
+
+        if (teacher.userId) {
+          try {
+            await prisma.schoolUser.delete({ where: { id: teacher.userId } });
+          } catch (e) {}
+        }
+        return { success: true };
+      }
+
+      return prisma.schoolUser.delete({ where: { id } });
+    }
+
+    const linkedTeacher = await prisma.teacher.findFirst({
+      where: { OR: [{ id }, { userId: id }] },
+    });
+    if (linkedTeacher) {
+      await prisma.teacherAllocation.deleteMany({ where: { teacherId: linkedTeacher.id } });
+      await prisma.timetablePeriod.deleteMany({ where: { teacherId: linkedTeacher.id } });
+      await prisma.teacher.delete({ where: { id: linkedTeacher.id } });
+    }
+
     return prisma.schoolUser.delete({ where: { id } });
   }
 }

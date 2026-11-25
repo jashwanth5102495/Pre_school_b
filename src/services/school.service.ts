@@ -450,6 +450,12 @@ export class SchoolService {
   async archiveSchool(id: string, actorId: string, actorEmail: string) {
     return this.updateSchoolStatus(id, SchoolStatus.ARCHIVED, 'School archived by Super Admin', actorId, actorEmail);
   }
+
+  async deleteSchool(id: string, actorId?: string, actorEmail?: string) {
+    return prisma.school.delete({
+      where: { id },
+    });
+  }
 }
 
 export const schoolService = new SchoolService();

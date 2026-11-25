@@ -19,8 +19,8 @@ async function bootstrap() {
       const platformUserCount = await prisma.platformUser.count();
       if (platformUserCount === 0) {
         console.log('[Server] Database is empty. Seeding initial super admin and starter school data...');
-        const { main: runSeed } = await import('../prisma/seed');
-        await runSeed();
+        const { execSync } = await import('child_process');
+        execSync('npx tsx prisma/seed.ts', { stdio: 'inherit' });
         console.log('[Server] Initial database seeding completed.');
       }
     } catch (seedErr: any) {

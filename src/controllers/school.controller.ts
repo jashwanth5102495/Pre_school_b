@@ -113,6 +113,18 @@ export class SchoolController {
       return errorResponse(res, err.message, 400, 'ARCHIVE_FAILED');
     }
   }
+
+  async deleteSchool(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actorId = req.user!.userId;
+      const actorEmail = req.user!.email;
+      const schoolId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const result = await schoolService.deleteSchool(schoolId, actorId, actorEmail);
+      return successResponse(res, result, 'School successfully deleted');
+    } catch (err: any) {
+      return errorResponse(res, err.message, 400, 'DELETE_FAILED');
+    }
+  }
 }
 
 export const schoolController = new SchoolController();

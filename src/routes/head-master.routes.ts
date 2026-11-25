@@ -7,11 +7,11 @@ import { SchoolRole } from '@prisma/client';
 
 const router = Router();
 
-// Head Master & School Admin can access Head Master routes
+// Head Master, School Admin, and Office Admin can access academic operations
 router.use(
   authenticate,
   enforceTenantContext,
-  requireSchoolRole(SchoolRole.HEAD_MASTER, SchoolRole.SCHOOL_ADMIN)
+  requireSchoolRole(SchoolRole.HEAD_MASTER, SchoolRole.SCHOOL_ADMIN, SchoolRole.OFFICE_ADMIN)
 );
 
 router.get('/dashboard', (req, res) => headMasterController.getDashboard(req, res));
