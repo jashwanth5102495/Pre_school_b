@@ -7,23 +7,70 @@ import { SchoolRole } from '@prisma/client';
 
 const router = Router();
 
-// Protect all school admin routes with Auth, Tenant isolation, and School Admin role
-router.use(authenticate, enforceTenantContext, requireSchoolRole(SchoolRole.SCHOOL_ADMIN));
+// Protect all school admin routes with Auth and Tenant isolation
+router.use(authenticate, enforceTenantContext);
 
-router.get('/dashboard', (req, res) => schoolAdminController.getDashboard(req, res));
-router.get('/students', (req, res) => schoolAdminController.getStudents(req, res));
-router.post('/students', (req, res) => schoolAdminController.createStudent(req, res));
-router.get('/students/:id', (req, res) => schoolAdminController.getStudentById(req, res));
-router.put('/students/:id', (req, res) => schoolAdminController.updateStudent(req, res));
+// Staff management (School Admin, Head Master, Office Admin can create & view faculty)
+router.get(
+  '/staff',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.getStaff(req, res)
+);
+router.post(
+  '/staff',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.createStaff(req, res)
+);
 
-router.get('/staff', (req, res) => schoolAdminController.getStaff(req, res));
-router.post('/staff', (req, res) => schoolAdminController.createStaff(req, res));
+// Students & Classes
+router.get(
+  '/students',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.getStudents(req, res)
+);
+router.post(
+  '/students',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.createStudent(req, res)
+);
+router.get(
+  '/students/:id',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.getStudentById(req, res)
+);
+router.put(
+  '/students/:id',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.updateStudent(req, res)
+);
 
-router.get('/classes', (req, res) => schoolAdminController.getClasses(req, res));
-router.get('/fees/overview', (req, res) => schoolAdminController.getFeesOverview(req, res));
-router.get('/attendance/overview', (req, res) => schoolAdminController.getAttendanceOverview(req, res));
+router.get(
+  '/classes',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.getClasses(req, res)
+);
 
-router.get('/profile', (req, res) => schoolAdminController.getProfile(req, res));
-router.put('/profile', (req, res) => schoolAdminController.updateProfile(req, res));
+// Dashboard & Metrics
+router.get('/dashboard', requireSchoolRole(SchoolRole.SCHOOL_ADMIN), (req, res) =>
+  schoolAdminController.getDashboard(req, res)
+);
+router.get(
+  '/fees/overview',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.OFFICE_ADMIN),
+  (req, res) => schoolAdminController.getFeesOverview(req, res)
+);
+router.get(
+  '/attendance/overview',
+  requireSchoolRole(SchoolRole.SCHOOL_ADMIN, SchoolRole.HEAD_MASTER),
+  (req, res) => schoolAdminController.getAttendanceOverview(req, res)
+);
+
+// School Profile
+router.get('/profile', requireSchoolRole(SchoolRole.SCHOOL_ADMIN), (req, res) =>
+  schoolAdminController.getProfile(req, res)
+);
+router.put('/profile', requireSchoolRole(SchoolRole.SCHOOL_ADMIN), (req, res) =>
+  schoolAdminController.updateProfile(req, res)
+);
 
 export default router;

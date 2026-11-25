@@ -311,8 +311,8 @@ export class HierarchyService {
           throw new Error('Head Master can only manage Teacher Faculty and Students');
         }
       } else if (actor.role === SchoolRole.OFFICE_ADMIN) {
-        if (type !== 'STUDENT') {
-          throw new Error('Office Finance can only manage Student Profiles');
+        if (type !== 'TEACHER' && type !== 'STUDENT') {
+          throw new Error('Office Finance can only manage Teacher Faculty and Students');
         }
       } else if (actor.role === SchoolRole.TEACHER) {
         if (type !== 'STUDENT') {
