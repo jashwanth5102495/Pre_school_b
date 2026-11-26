@@ -234,6 +234,17 @@ export class SchoolAdminService {
     const studentCode = data.studentCode || `STU-${String(count + 1).padStart(4, '0')}`;
     const admissionNo = data.admissionNo || `ADM-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
 
+    // Auto-resolve sectionId if only classId was provided
+    let sectionId = data.sectionId;
+    if (!sectionId && data.classId) {
+      const firstSection = await prisma.schoolSection.findFirst({
+        where: { schoolId, classId: data.classId },
+      });
+      if (firstSection) {
+        sectionId = firstSection.id;
+      }
+    }
+
     return prisma.student.create({
       data: {
         schoolId,
@@ -246,7 +257,7 @@ export class SchoolAdminService {
         gender: data.gender || null,
         dob: data.dob ? new Date(data.dob) : null,
         classId: data.classId || null,
-        sectionId: data.sectionId || null,
+        sectionId: sectionId || null,
         parentName: data.parentName || null,
         parentPhone: data.parentPhone || null,
         parentEmail: data.parentEmail || null,

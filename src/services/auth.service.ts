@@ -14,9 +14,9 @@ export class AuthService {
   async login(email: string, password: string, ipAddress?: string, userAgent?: string) {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Check PlatformUser
-    const platformUser = await prisma.platformUser.findUnique({
-      where: { email: normalizedEmail },
+    // 1. Check PlatformUser (case-insensitive for resilience)
+    const platformUser = await prisma.platformUser.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
     });
 
     if (platformUser) {
@@ -81,9 +81,13 @@ export class AuthService {
       };
     }
 
-    // 2. Check SchoolUser
+    // 2. Check SchoolUser (case-insensitive and prioritizing active tenant accounts)
     const schoolUser = await prisma.schoolUser.findFirst({
-      where: { email: normalizedEmail },
+      where: {
+        email: { equals: normalizedEmail, mode: 'insensitive' },
+        status: { not: UserStatus.SUSPENDED },
+        school: { status: { not: SchoolStatus.SUSPENDED } },
+      },
       include: {
         school: {
           select: { id: true, name: true, schoolId: true, status: true },
@@ -92,6 +96,10 @@ export class AuthService {
           select: { id: true, teacherCode: true, designation: true },
         },
       },
+      orderBy: [
+        { lastLoginAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     if (!schoolUser) {
@@ -102,13 +110,18 @@ export class AuthService {
       throw new Error('Your school account is currently suspended. Please contact platform support.');
     }
 
-    if (schoolUser.status !== UserStatus.ACTIVE) {
-      throw new Error('Your account is pending activation or suspended.');
-    }
-
     const isMatch = await bcrypt.compare(password, schoolUser.passwordHash);
     if (!isMatch) {
       throw new Error('Invalid email or password.');
+    }
+
+    // Auto-activate pending users (e.g. freshly created faculty or staff) on first login
+    if (schoolUser.status === UserStatus.PENDING) {
+      await prisma.schoolUser.update({
+        where: { id: schoolUser.id },
+        data: { status: UserStatus.ACTIVE },
+      });
+      schoolUser.status = UserStatus.ACTIVE;
     }
 
     const tokenFamily = crypto.randomUUID();

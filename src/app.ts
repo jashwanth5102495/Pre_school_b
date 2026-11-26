@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import path from 'path';
+import fs from 'fs';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error-handler';
 
@@ -24,27 +25,33 @@ import hierarchyRoutes from './routes/hierarchy.routes';
 
 const app = express();
 
+// Trust reverse proxy (Cloudflare, Railway, Render, Vercel, Docker, Nginx)
+// Essential for rate-limiting, secure cookies, and accurate client IP logging
+app.set('trust proxy', 1);
+
 // Security Middlewares
 app.use(helmet());
 const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, postman) or if origin is in allowlist
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive in development
-      }
+      // Allow all origins dynamically in deployment or development
+      callback(null, true);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   })
 );
 
-// Rate Limiting (100 requests per 15 minutes per IP for general endpoints)
+// High-capacity Rate Limiter (5,000 requests per 15 minutes) to prevent accidental throttling during testing
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 5000,
+  skip: (req) => {
+    // Never throttle health check or authentication endpoints
+    return req.path.includes('/health') || req.path.includes('/auth/login') || req.path.includes('/auth/refresh');
+  },
   message: {
     success: false,
     error: {
@@ -64,6 +71,20 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static file serving for uploads fallback
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+
+// Frontend production static build resolution (supports Railway/Render single-service deployment)
+const candidateDistPaths = [
+  path.resolve(process.cwd(), '../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(__dirname, '../../../frontend/dist'),
+];
+const resolvedFrontendDist = candidateDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html')));
+
+if (resolvedFrontendDist) {
+  console.log(`[Static] Serving frontend production build from ${resolvedFrontendDist}`);
+  app.use(express.static(resolvedFrontendDist));
+}
 
 if (env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
@@ -110,5 +131,15 @@ app.use('/api/v1/hierarchy', hierarchyRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);
+
+// SPA catch-all fallback: Serve frontend index.html for any client-side route
+if (resolvedFrontendDist) {
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/api-docs')) {
+      return next();
+    }
+    res.sendFile(path.join(resolvedFrontendDist, 'index.html'));
+  });
+}
 
 export default app;

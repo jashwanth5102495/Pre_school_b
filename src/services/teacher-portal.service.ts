@@ -179,6 +179,24 @@ export class TeacherPortalService {
     return fallback;
   }
 
+  async getDefaultSectionForClass(schoolId: string, classId: string) {
+    let section = await prisma.schoolSection.findFirst({
+      where: { schoolId, classId },
+      orderBy: { name: 'asc' },
+    });
+    if (!section) {
+      section = await prisma.schoolSection.create({
+        data: {
+          schoolId,
+          classId,
+          name: 'Section A',
+          capacity: 40,
+        },
+      });
+    }
+    return section;
+  }
+
   // Attendance Taking
   async getAttendanceSession(
     schoolId: string,

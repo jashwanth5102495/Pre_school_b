@@ -36,11 +36,17 @@ export class TeacherPortalController {
     try {
       const teacherId = await this.getTeacherId(req);
       const classId = req.query.classId as string;
-      const sectionId = req.query.sectionId as string;
+      let sectionId = req.query.sectionId as string;
       const date = req.query.date as string;
 
-      if (!classId || !sectionId) {
-        return errorResponse(res, 'classId and sectionId are required', 400);
+      if (!classId) {
+        return errorResponse(res, 'classId is required', 400);
+      }
+
+      // Auto-resolve sectionId if missing or invalid
+      if (!sectionId || sectionId === 'null' || sectionId === 'undefined' || sectionId === '') {
+        const sec = await teacherPortalService.getDefaultSectionForClass(req.tenantId!, classId);
+        sectionId = sec?.id || '';
       }
 
       const session = await teacherPortalService.getAttendanceSession(req.tenantId!, teacherId, {
@@ -57,7 +63,12 @@ export class TeacherPortalController {
   async markAttendance(req: Request, res: Response) {
     try {
       const teacherId = await this.getTeacherId(req);
-      const result = await teacherPortalService.markAttendance(req.tenantId!, teacherId, req.body);
+      const body = { ...req.body };
+      if (!body.sectionId && body.classId) {
+        const sec = await teacherPortalService.getDefaultSectionForClass(req.tenantId!, body.classId);
+        body.sectionId = sec?.id || '';
+      }
+      const result = await teacherPortalService.markAttendance(req.tenantId!, teacherId, body);
       return successResponse(res, result, 'Attendance marked successfully', 201);
     } catch (error: any) {
       return errorResponse(res, error.message || 'Failed to mark attendance', 400);

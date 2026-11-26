@@ -12,11 +12,12 @@ export class AuthController {
 
       const result = await authService.login(validated.email, validated.password, ipAddress, userAgent);
 
-      // Set HttpOnly refresh token cookie
+      // Set HttpOnly refresh token cookie (cross-site compatible for deployed frontends)
+      const isProd = process.env.NODE_ENV === 'production';
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
@@ -36,10 +37,11 @@ export class AuthController {
 
       const result = await authService.rotateRefreshToken(token);
 
+      const isProd = process.env.NODE_ENV === 'production';
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
